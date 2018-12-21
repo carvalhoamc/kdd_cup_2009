@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from imblearn.combine import SMOTEENN, SMOTETomek
 from imblearn.under_sampling import InstanceHardnessThreshold
 from sklearn import preprocessing
 from sklearn.feature_selection import SelectFromModel
@@ -67,8 +68,8 @@ print(df_label_upselling.shape)
 
 output_dir = './output_dir/'
 datasets = ['kdd_churn','kdd_appetency','kdd_upselling']
-train_smote_ext = ["_UNDERSAMPLING","_train", "_SMOTE"]
-nfolds = 2
+train_smote_ext = ["_SMOTETomek","_SMOTEENN""_UNDERSAMPLING","_train", "_SMOTE"]
+nfolds = 5
 base_estimator = AdaBoostClassifier(n_estimators=15)
 
 classifiers = {
@@ -78,7 +79,7 @@ classifiers = {
     "GNB": GaussianNB(),
     "LRG": LogisticRegression(),
     "ABC": AdaBoostClassifier(),
-    "MLP": MLPClassifier(max_iter=500,hidden_layer_sizes=(300,30)),
+    "MLP": MLPClassifier(max_iter=500,hidden_layer_sizes=(100,300)),
     "KDA": QuadraticDiscriminantAnalysis(),
     "SVM": SVC(probability=True),
     "SGD": SGDClassifier(loss="hinge", penalty="l2", max_iter=5),
@@ -126,6 +127,8 @@ def runSMOTEvariationsGen(folder):
     """
     smote = SMOTE(k_neighbors=10,n_jobs=-1)
     undersampler = InstanceHardnessThreshold(random_state=0, estimator=LogisticRegression(solver='lbfgs'))
+    smoteenn = SMOTEENN(random_state=0)
+    smotetomek = SMOTETomek(random_state=0)
 
     for dataset in datasets:
         for fold in range(nfolds):
@@ -133,6 +136,26 @@ def runSMOTEvariationsGen(folder):
             train = np.genfromtxt(path, delimiter=',')
             X = train[:, 0:train.shape[1] - 1]
             Y = train[:, train.shape[1] - 1]
+
+            # SMOTETomek
+            print("SMOTETomek..." + dataset)
+            print(fold)
+            X_res, y_res = smotetomek.fit_resample(X, Y)
+            y_res = y_res.reshape(len(y_res), 1)
+            newdata = np.hstack([X_res, y_res])
+            newtrain = pd.DataFrame(np.vstack([train, newdata]))
+            newtrain.to_csv(os.path.join(folder, dataset, str(fold), ''.join([dataset, "_SMOTETomek.csv"])),
+                            header=False, index=False)
+
+            # SMOTEENN
+            print("SMOTEENN..." + dataset)
+            print(fold)
+            X_res, y_res = smoteenn.fit_resample(X, Y)
+            y_res = y_res.reshape(len(y_res), 1)
+            newdata = np.hstack([X_res, y_res])
+            newtrain = pd.DataFrame(np.vstack([train, newdata]))
+            newtrain.to_csv(os.path.join(folder, dataset, str(fold), ''.join([dataset, "_SMOTEENN.csv"])),
+                            header=False, index=False)
 
 
             #Undersampling
