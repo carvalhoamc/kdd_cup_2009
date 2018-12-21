@@ -1,0 +1,213 @@
+ALGORITHM,PRE,REC,SPE,F1,GEO,IBA,ACC,AUC
+ABC,0.96,0.9800000000000001,0.02,0.97,0.0,0.0,0.9809299839657937,0.49997822536744696
+DTREE,0.9639999999999999,0.96,0.062,0.96,0.20599999999999996,0.048,0.9592731159807588,0.5112660305226531
+GNB,0.9719999999999999,0.124,0.9339999999999999,0.194,0.324,0.094,0.12470336718332445,0.5292310465217563
+KDA,0.97,0.202,0.876,0.314,0.41000000000000003,0.158,0.20256547300908606,0.5400215065265956
+KNN,0.9640000000000001,0.9800000000000001,0.022000000000000002,0.97,0.022,0.002,0.9809513629075359,0.5011234026726952
+LRG,0.96,0.9800000000000001,0.02,0.97,0.0,0.0,0.9809727418492784,0.5
+MLP,0.96,0.9800000000000001,0.02,0.97,0.0,0.0,0.9809727418492784,0.5
+RF,0.96,0.9800000000000001,0.02,0.97,0.0,0.0,0.9809727418492784,0.5
+SGD,0.96,0.9800000000000001,0.02,0.97,0.0,0.0,0.9809727418492784,0.5
+SVM,0.96,0.9800000000000001,0.02,0.97,0.0,0.0,0.9809727418492784,0.5
+
+
+
+
+
+
+from sklearn import metrics
+import numpy as np
+import pandas as pd
+from imblearn.metrics import classification_report_imbalanced
+from imblearn.under_sampling import AllKNN
+from sklearn import metrics
+from sklearn import preprocessing
+from sklearn.decomposition import PCA
+from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+from sklearn.ensemble import AdaBoostClassifier, ExtraTreesClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import SelectFromModel
+from sklearn.linear_model import LogisticRegression, SGDClassifier
+from sklearn.manifold import Isomap
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import KFold
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.preprocessing import normalize
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from collections import Counter
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+from sklearn.datasets import make_classification
+from sklearn.svm import LinearSVC
+from sklearn.linear_model import LogisticRegression
+
+from imblearn.pipeline import make_pipeline
+from imblearn.under_sampling import (ClusterCentroids, RandomUnderSampler,
+                                     NearMiss,
+                                     InstanceHardnessThreshold,
+                                     CondensedNearestNeighbour,
+                                     EditedNearestNeighbours,
+                                     RepeatedEditedNearestNeighbours,
+                                     AllKNN,
+                                     NeighbourhoodCleaningRule,
+                                     OneSidedSelection)
+print(__doc__)
+
+def plot_resampling(X, y, sampling, ax):
+    X_res, y_res = sampling.fit_resample(X, y)
+    ax.scatter(X_res[:, 0], X_res[:, 1], c=y_res, alpha=0.8, edgecolor='k')
+    # make nice plotting
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.get_xaxis().tick_bottom()
+    ax.get_yaxis().tick_left()
+    ax.spines['left'].set_position(('outward', 10))
+    ax.spines['bottom'].set_position(('outward', 10))
+    return Counter(y_res)
+
+
+def plot_decision_function(X, y, clf, ax):
+    plot_step = 0.02
+    x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
+    y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, plot_step),
+                         np.arange(y_min, y_max, plot_step))
+
+    Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
+    Z = Z.reshape(xx.shape)
+    ax.contourf(xx, yy, Z, alpha=0.4)
+    ax.scatter(X[:, 0], X[:, 1], alpha=0.8, c=y, edgecolor='k')
+
+
+base_estimator = AdaBoostClassifier(n_estimators=25)
+
+classifiers = {
+    "RF": RandomForestClassifier(n_estimators=50,n_jobs=-1),
+    "KNN": KNeighborsClassifier(),
+    "DTREE": DecisionTreeClassifier(),
+    "GNB": GaussianNB(),
+    "LRG": LogisticRegression(),
+    "ABC": AdaBoostClassifier(),
+    "MLP": MLPClassifier(max_iter=500,hidden_layer_sizes=(300,30)),
+    "KDA": QuadraticDiscriminantAnalysis(),
+    "SVM": SVC(probability=True),
+    "SGD": SGDClassifier(loss="hinge", penalty="l2", max_iter=5),
+}
+
+
+def runIsomap(x, dimension):
+    isomap = Isomap(n_components=dimension)
+    X_isomap = isomap.fit_transform(x)
+    return X_isomap
+
+
+def runPCA(x, dimension):
+    pca = PCA(n_components=dimension)
+    X_pca = pca.fit_transform(x)
+    return X_pca
+
+
+nfolds = 5
+kf = KFold(n_splits=nfolds, shuffle=True)
+# transformer = Normalizer()
+
+train_file = './folder/orange_small_train.data'
+appetency_label_file = './folder/orange_small_train_appetency.labels'
+churn_label_file = './folder/orange_small_train_churn.labels'
+upselling_label_file = './folder/orange_small_train_upselling.labels'
+
+le = preprocessing.LabelEncoder()
+
+x_df = pd.read_csv(train_file, sep='\t')
+y1_df = pd.read_csv(appetency_label_file, sep='\t', header=None)
+y2_df = pd.read_csv(churn_label_file, sep='\t', header=None)
+y3_df = pd.read_csv(upselling_label_file, sep='\t', header=None)
+x_df = x_df.fillna(0)
+# verify categorical cols
+cols = x_df.columns
+num_cols = x_df._get_numeric_data().columns
+categorical_cols = list(set(cols) - set(num_cols))
+for c in categorical_cols:
+    v = list(x_df[c])
+    new_v = le.fit_transform(v)
+    x_df[c] = new_v  # new values to col dataframe
+
+X = x_df.values
+X = normalize(X)
+y = y1_df.values
+
+clf = ExtraTreesClassifier(n_estimators=20)
+clf = clf.fit(X, y)
+model = SelectFromModel(clf, prefit=True)
+X_new = model.transform(X)
+X = X_new
+# print("start PCA")
+# X = runPCA(X,10)
+# print('end PCA')
+
+allknn = AllKNN(allow_minority=True)
+X_res, y_res = allknn.fit_resample(X, y)
+X = X_res
+y = y_res
+
+dfcol = ['FOLD', 'ALGORITHM', 'PRE', 'REC', 'SPE', 'F1', 'GEO', 'IBA', 'ACC', 'AUC']
+
+i = 0
+fold = 0
+end_index = classifiers.__len__()
+idx = np.arange(0, end_index * nfolds)
+df1 = pd.DataFrame(columns=dfcol, index=idx)
+print("inicio")
+for train_index, test_index in kf.split(X):
+    X_train, X_test = X[train_index], X[test_index]
+    y_train, y_test = y[train_index], y[test_index]
+    for name, clf in classifiers.items():
+        clf.fit(X_train, y_train)
+        y_pred = clf.predict(X_test)
+        res = classification_report_imbalanced(y_test, y_pred)
+        aux = res.split()
+        score = aux[-7:-1]
+        df1.iat[i, 0] = fold
+        df1.iat[i, 1] = name
+        df1.iat[i, 2] = score[0]
+        df1.iat[i, 3] = score[1]
+        df1.iat[i, 4] = score[2]
+        df1.iat[i, 5] = score[3]
+        df1.iat[i, 6] = score[4]
+        df1.iat[i, 7] = score[5]
+        df1.iat[i, 8] = accuracy_score(y_test, y_pred)
+        fpr, tpr, thresholds = metrics.roc_curve(y_test, y_pred)
+        df1.iat[i, 9] = metrics.auc(fpr, tpr)
+        i = i + 1
+        print(str(fold) + ' ' + str(name))
+        print(df1)
+    fold = fold + 1
+df1.to_csv('under_appetency_ensemble_results_kdd.csv', index=False, mode='a')
+
+t = pd.Series(data=np.arange(0, df1.shape[0], 1))
+dfr = pd.DataFrame(columns=['ALGORITHM', 'PRE', 'REC', 'SPE', 'F1', 'GEO', 'IBA', 'ACC', 'AUC'],
+                   index=np.arange(0, int(t.shape[0] / nfolds)))
+df_temp = df1.groupby(by=['ALGORITHM'])
+idx = dfr.index.values
+i = idx[0]
+for name, group in df_temp:
+    group = group.reset_index()
+    dfr.at[i, 'ALGORITHM'] = group.loc[0, 'ALGORITHM']
+    dfr.at[i, 'PRE'] = group['PRE'].astype(float).mean()
+    dfr.at[i, 'REC'] = group['REC'].astype(float).mean()
+    dfr.at[i, 'SPE'] = group['SPE'].astype(float).mean()
+    dfr.at[i, 'F1'] = group['F1'].astype(float).mean()
+    dfr.at[i, 'GEO'] = group['GEO'].astype(float).mean()
+    dfr.at[i, 'IBA'] = group['IBA'].astype(float).mean()
+    dfr.at[i, 'ACC'] = group['ACC'].astype(float).mean()
+    dfr.at[i, 'AUC'] = group['AUC'].astype(float).mean()
+
+    i = i + 1
+
+dfr.to_csv('under_appetency_ensemble_media_results_kdd.csv', index=False)
+print('fim')
